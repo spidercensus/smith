@@ -1,18 +1,20 @@
-import inotify.adapters
 import json
 import logging
-from platform import platform, python_version_tuple, system, uname
+from platform import python_version_tuple, system, uname
+from pprint import pprint
+from concurrent.futures import ThreadPoolExecutor
 
+LOG = logging.Logger(__name__)
 
 CONFIG_FILE = 'config.json'
 
 
 def fatal(msg):
-    logging.error(msg)
+    LOG.error(msg)
     exit(1)
 
 
-def loadConfig(filename):
+def load_config(filename):
     contents = None
     try:
         with open(filename, 'r') as fh:
@@ -28,10 +30,22 @@ def loadConfig(filename):
                 if key not in watch:
                     fatal("Each 'watches' element must contain source and dest:\n{}".format(watch))
 
+            if 'operation' not in watch:
+                watch['operation'] = 'copy'
+            if watch['operation'] not in ['copy', 'move']:
+                fatal("operation attribute must be either copy or move: {} ".format(watch))
+
+            if 'recursive' not in watch:
+                watch['recursive'] = False
+            if watch['recursive'] not in [True, False]:
+                fatal("recursive attribute must be either True or False: {}".format(watch))
+        if 'verbose' in contents and contents['verbose']:
+            pass
+        LOG.info(contents)
     return contents
 
 
-def is_inotify_supported():
+def inotify_supported():
     supported = True
     kernel = uname().release.split('-')[0].split('.')[:2]
     kernel = float('.'.join(kernel))
@@ -44,13 +58,25 @@ def is_inotify_supported():
     return supported
 
 
-def watch(w_conf):
-    pass
+def watch_inotify(w_conf):
+    print("watch_inotify: {}".format(w_conf))
 
 
 def watch_legacy(w_conf):
-    pass
+    print("watch_legacy: {}".format(w_conf))
+
+
+def init_watchers(watches, method):
+    exec_future = None
+    with ThreadPoolExecutor(max_workers=len(watches)) as executor:
+        for watch in watches:
+            exec_future = executor.submit(method, watch)
+    return exec_future
+
+
 
 
 if __name__=="__main__":
-    config = loadConfig(CONFIG_FILE)
+    config = load_config(CONFIG_FILE)
+    watch_method = watch_inotify if inotify_supported() else watch_legacy
+    init_watchers(config['watches'], watch_method)

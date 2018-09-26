@@ -1,0 +1,11 @@
+{
+    "watches": [
+        {
+            "source": "/home/jpack/torrents/",
+            "dest": "/tmp/torrents",
+            "recursive": false
+        }
+    ],
+    "verbose": true
+}
+
