@@ -2,7 +2,7 @@ import json
 import logging
 from platform import python_version_tuple, system, uname
 from pprint import pprint
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 import inotify.adapters
 import os.path
 
@@ -76,8 +76,13 @@ def sync(source, dest):
 def watch_inotify(w_conf):
     print("watch_inotify: {}".format(w_conf))
     i = inotify.adapters.Inotify()
-    i.add_watch(w_conf['source'])
+    try:
+        i.add_watch(w_conf['source'])
+    except Exception as e:
+        fatal("add watcher {} failed: {}".format(w_conf['source'],e))
     for event in i.event_gen(yield_nones=False):
+        if i is None:
+            continue
         if 'IN_CLOSE_WRITE' in event[1]:
             source = os.path.join(w_conf['source'], event[-1])
             dest = os.path.join(w_conf['dest'], event[-1])
@@ -90,14 +95,15 @@ def watch_legacy(w_conf):
 
 
 def init_watchers(watches, method):
-    exec_future = None
-    with ThreadPoolExecutor(max_workers=len(watches)) as executor:
-        for watch in watches:
-            exec_future = executor.submit(method, watch)
-    return exec_future
+    executor = ThreadPoolExecutor(max_workers=len(watches))
+    futures = []
+    for watch in watches:
+        exec_future = executor.submit(method, watch)
+        futures.append(exec_future)
+    return futures
 
 
 if __name__=="__main__":
     config = load_config(CONFIG_FILE)
     watch_method = watch_inotify if inotify_supported() else watch_legacy
-    init_watchers(config['watches'], watch_method)
+    watchers = init_watchers(config['watches'], watch_method)

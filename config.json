@@ -1,7 +1,7 @@
 {
     "watches": [
         {
-            "source": "/home/jpack/torrents/",
+            "source": "/home/jpack",
             "dest": "/tmp/torrents",
             "recursive": false
         }
