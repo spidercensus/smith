@@ -3,6 +3,8 @@ import logging
 from platform import python_version_tuple, system, uname
 from pprint import pprint
 from concurrent.futures import ThreadPoolExecutor
+import inotify.adapters
+import os.path
 
 LOG = logging.Logger(__name__)
 
@@ -58,8 +60,30 @@ def inotify_supported():
     return supported
 
 
+def copy(source, dest):
+    print("called copy({},{})".format(source, dest))
+    pass
+
+
+def move(source, dest):
+    pass
+
+
+def sync(source, dest):
+    pass
+
+
 def watch_inotify(w_conf):
-    print("watch_inotify: {}".format(w_conf))
+    # print("watch_inotify: {}".format(w_conf))
+    i = inotify.adapters.Inotify()
+    i.add_watch(w_conf['source'])
+    for event in i.event_gen(yield_nones=False):
+        if 'IN_CLOSE_WRITE' in event[1]:
+            source = os.path.join(w_conf['source'], event[-1])
+            dest = os.path.join(w_conf['dest'], event[-1])
+            if w_conf['operation'] is 'copy':
+                copy(source, dest)
+
 
 
 def watch_legacy(w_conf):
@@ -74,9 +98,8 @@ def init_watchers(watches, method):
     return exec_future
 
 
-
-
 if __name__=="__main__":
     config = load_config(CONFIG_FILE)
+    if
     watch_method = watch_inotify if inotify_supported() else watch_legacy
     init_watchers(config['watches'], watch_method)
